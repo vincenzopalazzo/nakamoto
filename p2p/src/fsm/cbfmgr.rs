@@ -850,7 +850,10 @@ impl<F: Filters, U: Wire<Event> + SetTimer + Disconnect, C: Clock> FilterManager
         let filter_height = self.filters.height();
         let block_height = tree.height();
 
-        assert!(filter_height <= block_height);
+        if filter_height > block_height {
+            log::info!("filter height (`{filter_height}`) grater than the block height (`{block_height}`)");
+            return;
+        }
 
         // Don't start syncing filter headers until block headers are synced passed the last
         // checkpoint. BIP 157 states that we should sync the full block header chain before
