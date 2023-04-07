@@ -57,7 +57,7 @@ use nakamoto_common::bitcoin::network::message_filter::GetCFilters;
 use nakamoto_common::bitcoin::network::message_network::VersionMessage;
 use nakamoto_common::bitcoin::network::Address;
 use nakamoto_common::bitcoin::util::uint::Uint256;
-use nakamoto_common::bitcoin::Script;
+use nakamoto_common::bitcoin::{Script, Txid};
 use nakamoto_common::block::filter::Filters;
 use nakamoto_common::block::time::AdjustedClock;
 use nakamoto_common::block::time::{LocalDuration, LocalTime};
@@ -282,6 +282,13 @@ pub enum Command {
         Transaction,
         chan::Sender<Result<NonEmpty<PeerId>, CommandError>>,
     ),
+    /// Get the Utxo
+    GetUtxo{
+        /// transaction has that should contains the UTXO.
+        txid: Txid,
+        /// the outpoint index inside the list of output transaction.
+        idx: usize,
+    }
 }
 
 impl fmt::Debug for Command {
@@ -307,6 +314,7 @@ impl fmt::Debug for Command {
             Self::ImportHeaders(_headers, _) => write!(f, "ImportHeaders(..)"),
             Self::ImportAddresses(addrs) => write!(f, "ImportAddresses({:?})", addrs),
             Self::SubmitTransaction(tx, _) => write!(f, "SubmitTransaction({:?})", tx),
+            Self::GetUtxo { txid, idx } => write!(f, "GetUtxo({txid}, {idx})"),
         }
     }
 }
@@ -761,6 +769,9 @@ impl<T: BlockTree, F: Filters, P: peer::Store, C: AdjustedClock<PeerId>> StateMa
             }
             Command::Watch { watch } => {
                 self.cbfmgr.watch(watch);
+            }
+            Command::GetUtxo { ref txid, idx } => {
+               self.invmgr.get_utxo(txid, idx);
             }
         }
     }

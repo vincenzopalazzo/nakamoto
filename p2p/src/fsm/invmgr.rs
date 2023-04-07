@@ -22,7 +22,7 @@
 use std::collections::BTreeMap;
 
 use nakamoto_common::bitcoin::network::{constants::ServiceFlags, message_blockdata::Inventory};
-use nakamoto_common::bitcoin::{Block, BlockHash, Transaction, Txid, Wtxid};
+use nakamoto_common::bitcoin::{Block, BlockHash, Transaction, Txid, Wtxid, TxOut};
 
 // TODO: Timeout should be configurable
 // TODO: Add exponential back-off
@@ -95,6 +95,11 @@ pub enum Event {
         /// Peer who timed out.
         peer: PeerId,
     },
+    /// A UTXO requested by the user
+    GetUtxo {
+        /// transaction output requested
+        transaction: TxOut,
+    }
 }
 
 impl std::fmt::Display for Event {
@@ -128,6 +133,7 @@ impl std::fmt::Display for Event {
                 write!(fmt, "Transaction {} was reverted", transaction.txid(),)
             }
             Event::TimedOut { peer } => write!(fmt, "Peer {} timed out", peer),
+            Event::GetUtxo { transaction } => write!(fmt, "Utxo requested {:?} found", transaction),
         }
     }
 }
@@ -282,6 +288,21 @@ impl<U: Wire<Event> + SetTimer, C: Clock> InventoryManager<U, C> {
         }
     }
 
+    /// lookup inside the mempool for a UTXO with the `txid` and `idx` provided.
+    pub fn get_utxo(&mut self, txid: &Txid, idx: usize) {
+        if let Some(tx) = self.mempool.values().find(|tx| tx.txid() == *txid) {
+            let utxo = tx.output.get(idx);
+            if utxo.is_none() {
+                log::warn!("output at {idx} not present");
+                return;
+            }
+            let utxo = utxo.unwrap();
+            self.upstream.event(Event::GetUtxo { transaction: utxo.to_owned() })
+        } else {
+            log::debug!("transaction with {txid} not present in the mempool!")
+        }
+    }
+
     /// Called when we receive a tick.
     pub fn received_wake<T: BlockReader>(&mut self, tree: &T) {
         let now = self.clock.local_time();
@@ -399,6 +420,10 @@ impl<U: Wire<Event> + SetTimer, C: Clock> InventoryManager<U, C> {
                                 });
                             }
                         }
+                    } else {
+                        // When there is a transaction that it is required by `txid` it is possible
+                        // that it is not a utxo anymore, so we do not add inside the mempool and we handle
+                        // it as a separate case, and we add it inside the mempool later.
                     }
                 }
                 Inventory::WTx(wtxid) => {

@@ -18,6 +18,8 @@ use nakamoto_chain::filter::cache::FilterCache;
 use nakamoto_chain::filter::cache::StoredHeader;
 use nakamoto_chain::{block::cache::BlockCache, filter::BlockFilter};
 
+use nakamoto_common::bitcoin::TxOut;
+use nakamoto_common::bitcoin::Txid;
 use nakamoto_common::bitcoin::network::constants::ServiceFlags;
 use nakamoto_common::bitcoin::network::message::NetworkMessage;
 use nakamoto_common::bitcoin::network::Address;
@@ -35,6 +37,7 @@ pub use nakamoto_common::network::Network;
 pub use nakamoto_common::p2p::Domain;
 pub use nakamoto_net::event;
 pub use nakamoto_p2p::fsm::{Command, CommandError, Hooks, Limits, Link, Peer};
+use nakamoto_net::{Reactor, Waker};
 
 pub use crate::error::Error;
 pub use crate::event::{Event, Loading};
@@ -44,7 +47,6 @@ pub use crate::service::Service;
 
 use crate::event::Mapper;
 use crate::peer;
-use nakamoto_net::{Reactor, Waker};
 
 /// Client configuration.
 #[derive(Debug, Clone)]
@@ -642,6 +644,17 @@ impl<W: Waker> handle::Handle for Handle<W> {
         self.command(Command::SubmitTransaction(tx, transmit))?;
 
         receive.recv()?.map_err(handle::Error::Command)
+    }
+
+    fn get_utxo(&self, txid: &Txid, idx: usize) -> Result<Option<TxOut>, handle::Error> {
+        self.command(Command::GetUtxo { txid: txid.to_owned(), idx })?;
+        self.wait(|event| {
+           if let fsm::Event::Inventory(fsm::InventoryEvent::GetUtxo { transaction }) = event {
+               Some(Ok(Some(transaction)))
+           } else {
+               None
+           }
+        })?
     }
 
     fn wait<F, T>(&self, f: F) -> Result<T, handle::Error>

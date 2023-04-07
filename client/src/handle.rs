@@ -8,7 +8,8 @@ use thiserror::Error;
 
 use nakamoto_common::bitcoin::network::constants::ServiceFlags;
 use nakamoto_common::bitcoin::network::Address;
-use nakamoto_common::bitcoin::Script;
+use nakamoto_common::bitcoin::util::uint::Uint256;
+use nakamoto_common::bitcoin::{Script, Txid, TxOut};
 
 use nakamoto_common::bitcoin::network::message::NetworkMessage;
 use nakamoto_common::block::filter::BlockFilter;
@@ -170,6 +171,10 @@ pub trait Handle: Sized + Send + Sync + Clone {
     /// Wait for the node's active chain to reach a certain height. The hash at that height
     /// is returned.
     fn wait_for_height(&self, h: Height) -> Result<BlockHash, Error>;
+
+    /// Return a `utxo` by looking inside the tansaction with `txid` provided.
+    fn get_utxo(&self, txid: &Txid, idx: usize) -> Result<Option<TxOut>, Error>;
+
     /// Shutdown the node process.
     fn shutdown(self) -> Result<(), Error>;
 }
