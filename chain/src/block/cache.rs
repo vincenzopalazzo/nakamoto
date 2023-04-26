@@ -137,7 +137,6 @@ impl<S: Store<Header = BlockHeader>> BlockCache<S> {
     ) -> Result<Self, Error> {
         for result in self.store.iter().skip(1) {
             let (height, header) = result?;
-
             self.chain.push(CachedBlock { height, header });
             self.chainwork = self.chainwork + header.work();
 
@@ -158,10 +157,33 @@ impl<S: Store<Header = BlockHeader>> BlockCache<S> {
             }
         }
 
-        // Build header index.
-        for cb in self.chain.tail.iter() {
+        // Build header index from the first element, we already
+        // put genesis block inside the headers.
+        //
+        // we keep track of the current height added
+        // to be able to rollback in case of the storage
+        // has populated
+        let mut height = 0;
+        for cb in self.chain.tail.iter().skip(1) {
+            if self.headers.contains_key(&cb.prev_blockhash) {
+                // SAFETY: it is safe doing this here because we check before!
+                let prev_found = self.headers.get(&cb.prev_blockhash).unwrap().to_owned();
+                log::warn!("Current block {} was already found while tracking the header at height `{prev_found}`", cb.block_hash());
+                log::warn!("Truncating the store to the last sane height known `{height}`");
+                self.store.rollback(height)?;
+                self.store.sync()?;
+                // we truncate with height - 1 because there is the
+                // genesis block that it is not taken into count inside
+                // the chain structure.
+                self.chain.truncate((height - 1) as usize);
+                break;
+            }
             self.headers.insert(cb.prev_blockhash, cb.height - 1);
+            height = cb.height - 1;
         }
+        // in the case of a dirty store, we should override the same
+        // item, so there is no need of remove this call if we exit
+        // early from the previous for loop.
         self.headers.insert(self.chain.last().hash(), self.height());
 
         let length = self.store.len()?;
