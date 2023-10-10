@@ -22,4 +22,4 @@ macro_rules! source {
         let name = type_of(f);
         &name[..name.len() - 3]
     }};
-}
+ }
