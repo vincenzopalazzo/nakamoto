@@ -432,7 +432,7 @@ impl<U: Wire<Event> + SetTimer + Connect + Disconnect, C: Clock> PeerManager<U, 
     pub fn received_version<A: AddressSource>(
         &mut self,
         addr: &PeerId,
-        msg: VersionMessage,
+        msg: &VersionMessage,
         height: Height,
         addrs: &mut A,
     ) {
@@ -444,7 +444,7 @@ impl<U: Wire<Event> + SetTimer + Connect + Disconnect, C: Clock> PeerManager<U, 
     fn handle_version<A: AddressSource>(
         &mut self,
         addr: &PeerId,
-        msg: VersionMessage,
+        msg: &VersionMessage,
         height: Height,
         addrs: &mut A,
     ) -> Result<(), DisconnectReason> {

@@ -191,11 +191,7 @@ impl Outbox {
 
         self.push(Io::Write(
             addr,
-            RawNetworkMessage {
-                magic: self.network.magic(),
-                payload,
-            },
-        ));
+            RawNetworkMessage::new(self.network.magic(), payload)));
         self
     }
 

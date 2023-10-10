@@ -555,7 +555,7 @@ impl<F: Filters, U: Wire<Event> + SetTimer + Disconnect, C: Clock> FilterManager
     pub fn received_cfheaders<T: BlockReader>(
         &mut self,
         from: &PeerId,
-        msg: CFHeaders,
+        msg: &CFHeaders,
         tree: &T,
     ) -> Result<Height, Error> {
         let from = *from;
@@ -611,7 +611,7 @@ impl<F: Filters, U: Wire<Event> + SetTimer + Disconnect, C: Clock> FilterManager
             });
         }
 
-        let hashes = msg.filter_hashes;
+        let hashes = msg.filter_hashes.clone();
         let count = hashes.len();
 
         if start_height > stop_height {
@@ -678,7 +678,7 @@ impl<F: Filters, U: Wire<Event> + SetTimer + Disconnect, C: Clock> FilterManager
     pub fn received_getcfheaders<T: BlockReader>(
         &mut self,
         from: &PeerId,
-        msg: GetCFHeaders,
+        msg: &GetCFHeaders,
         tree: &T,
     ) -> Result<(), Error> {
         let from = *from;
@@ -733,7 +733,7 @@ impl<F: Filters, U: Wire<Event> + SetTimer + Disconnect, C: Clock> FilterManager
     pub fn received_cfilter<T: BlockReader>(
         &mut self,
         from: &PeerId,
-        msg: CFilter,
+        msg: &CFilter,
         tree: &T,
     ) -> Result<Vec<(Height, BlockHash)>, Error> {
         let from = *from;

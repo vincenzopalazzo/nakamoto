@@ -441,7 +441,7 @@ impl<U: SetTimer + Disconnect + Wire<Event>, C: Clock> SyncManager<U, C> {
 
     /// Called when we received an `inv` message. This will happen if we are out of sync with a
     /// peer, and blocks are being announced. Otherwise, we expect to receive a `headers` message.
-    pub fn received_inv<T: BlockReader>(&mut self, addr: PeerId, inv: Vec<Inventory>, tree: &T) {
+    pub fn received_inv<T: BlockReader>(&mut self, addr: PeerId, inv: &Vec<Inventory>, tree: &T) {
         // Don't try to fetch headers from `inv` message while syncing. It's not helpful.
         if self.is_syncing() {
             return;
@@ -458,7 +458,7 @@ impl<U: SetTimer + Disconnect + Wire<Event>, C: Clock> SyncManager<U, C> {
         };
         let mut best_block = None;
 
-        for i in &inv {
+        for i in inv {
             if let Inventory::Block(hash) = i {
                 peer.tip = *hash;
 

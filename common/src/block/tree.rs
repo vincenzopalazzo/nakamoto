@@ -200,20 +200,18 @@ pub trait BlockReader {
     /// Get the next difficulty given a block height, time and bits.
     fn next_difficulty_target(
         &self,
-        last_height: Height,
-        last_time: BlockTime,
-        last_target: Target,
         params: &Params,
+        last_height: Height,
+        last_header: BlockHeader,
+        new_block_timestamp: BlockTime,
     ) -> Bits {
         // FIXME: improve the API usage and change the nakamoto height
         calculate_next_work_required(
+            params,
             bitcoin::absolute::Height::from_consensus(last_height as u32).unwrap(),
-            last_time,
-            last_target,
-            params.difficulty_adjustment_interval(),
-            params.pow_target_timespan,
-            params.no_pow_retargeting,
+            last_header,
+            new_block_timestamp,
             |_| todo!(),
-        )
+        ).unwrap() // FIXME: remove the unwrap
     }
 }

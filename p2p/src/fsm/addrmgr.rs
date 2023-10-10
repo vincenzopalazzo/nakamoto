@@ -333,7 +333,7 @@ impl<P: Store, U: Wire<Event>, C: Clock> AddressManager<P, U, C> {
     }
 
     /// Called when we received an `addr` message from a peer.
-    pub fn received_addr(&mut self, peer: net::SocketAddr, addrs: Vec<(BlockTime, Address)>) {
+    pub fn received_addr(&mut self, peer: net::SocketAddr, addrs: &Vec<(BlockTime, Address)>) {
         if addrs.is_empty() || addrs.len() > MAX_ADDR_ADDRESSES {
             // Peer misbehaving, got empty message or too many addresses.
             return;
@@ -344,7 +344,8 @@ impl<P: Store, U: Wire<Event>, C: Clock> AddressManager<P, U, C> {
             count: addrs.len(),
             source,
         });
-        self.insert(addrs.into_iter(), source);
+        // Mh! to_vec :(
+        self.insert(addrs.to_vec().into_iter(), source);
     }
 
     /// Add addresses to the address manager. The input matches that of the `addr` message

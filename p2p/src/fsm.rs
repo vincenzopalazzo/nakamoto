@@ -325,11 +325,11 @@ pub struct Hooks {
         Arc<dyn Fn(PeerId, &NetworkMessage, &Outbox) -> Result<(), &'static str> + Send + Sync>,
     /// Called when a `version` message is received.
     /// If an error is returned, the peer is dropped, and the error is logged.
-    pub on_version: Arc<dyn Fn(PeerId, VersionMessage) -> Result<(), &'static str> + Send + Sync>,
+    pub on_version: Arc<dyn Fn(PeerId, &VersionMessage) -> Result<(), &'static str> + Send + Sync>,
     /// Called when a `getcfilters` message is received.
-    pub on_getcfilters: Arc<dyn Fn(PeerId, GetCFilters, &Outbox) + Send + Sync>,
+    pub on_getcfilters: Arc<dyn Fn(PeerId, &GetCFilters, &Outbox) + Send + Sync>,
     /// Called when a `getdata` message is received.
-    pub on_getdata: Arc<dyn Fn(PeerId, Vec<Inventory>, &Outbox) + Send + Sync>,
+    pub on_getdata: Arc<dyn Fn(PeerId, &Vec<Inventory>, &Outbox) + Send + Sync>,
 }
 
 impl Default for Hooks {
@@ -849,19 +849,19 @@ impl<T: BlockTree, F: Filters, P: peer::Store, C: AdjustedClock<PeerId>> traits:
                 }
             }
             NetworkMessage::Ping(nonce) => {
-                if self.pingmgr.received_ping(addr, nonce) {
+                if self.pingmgr.received_ping(addr, *nonce) {
                     self.addrmgr.peer_active(addr);
                 }
             }
             NetworkMessage::Pong(nonce) => {
-                if self.pingmgr.received_pong(addr, nonce, now) {
+                if self.pingmgr.received_pong(addr, *nonce, now) {
                     self.addrmgr.peer_active(addr);
                 }
             }
             NetworkMessage::Headers(headers) => {
                 match self
                     .syncmgr
-                    .received_headers(&addr, headers, &self.clock, &mut self.tree)
+                    .received_headers(&addr, headers.to_vec(), &self.clock, &mut self.tree)
                 {
                     Err(e) => log::error!("Error receiving headers: {}", e),
                     Ok(ImportResult::TipChanged(_, _, _, reverted, _)) => {
@@ -895,7 +895,7 @@ impl<T: BlockTree, F: Filters, P: peer::Store, C: AdjustedClock<PeerId>> traits:
                 ..
             }) => {
                 self.syncmgr
-                    .received_getheaders(&addr, (locator_hashes, stop_hash), &self.tree);
+                    .received_getheaders(&addr, (locator_hashes.to_vec(), *stop_hash), &self.tree);
             }
             NetworkMessage::Block(block) => {
                 for confirmed in self.invmgr.received_block(&addr, block, &self.tree) {

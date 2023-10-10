@@ -1,11 +1,12 @@
-//! Types and utilities related to transaction fees and fee rates.
+ //! Types and utilities related to transaction fees and fee rates.
 use std::collections::VecDeque;
 
 use nakamoto_common::bitcoin::blockdata::constants::WITNESS_SCALE_FACTOR;
 use nakamoto_common::bitcoin::{Block, OutPoint, Transaction, TxOut};
-
+use nakamoto_common::bitcoin::amount::Amount;
 use nakamoto_common::collections::HashMap;
 use nakamoto_common::nonempty::NonEmpty;
+
 
 use super::Height;
 
@@ -138,8 +139,8 @@ impl FeeEstimator {
     /// Apply the transaction to the UTXO set and calculate the fee rate.
     fn apply(&mut self, tx: &Transaction) -> Option<FeeRate> {
         let txid = tx.txid();
-        let mut received = 0;
-        let mut sent = 0;
+        let mut received = Amount::from_sat(0);
+        let mut sent = Amount::from_sat(0);
 
         // Look for outputs.
         for (vout, output) in tx.output.iter().enumerate() {
@@ -170,7 +171,7 @@ impl FeeEstimator {
 
         let fee = received - sent;
         let weight = tx.weight();
-        let rate = fee as f64 / (weight.to_wu() as f64 / WITNESS_SCALE_FACTOR as f64);
+        let rate = fee.to_sat() as f64 / (weight.to_wu() as f64 / WITNESS_SCALE_FACTOR as f64);
 
         Some(rate.round() as FeeRate)
     }

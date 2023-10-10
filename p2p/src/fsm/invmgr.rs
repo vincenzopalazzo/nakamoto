@@ -439,7 +439,7 @@ impl<U: Wire<Event> + SetTimer, C: Clock> InventoryManager<U, C> {
     pub fn received_block<T: BlockReader>(
         &mut self,
         from: &PeerId,
-        block: Block,
+        block: &Block,
         tree: &T,
     ) -> Vec<Txid> {
         let hash = block.block_hash();
@@ -467,7 +467,7 @@ impl<U: Wire<Event> + SetTimer, C: Clock> InventoryManager<U, C> {
         };
 
         // Add to processing queue. Blocks are processed in-order only.
-        self.received.insert(height, block);
+        self.received.insert(height, block.clone());
         self.upstream.event(Event::BlockReceived { from, height });
 
         // If there are still blocks remaining to download, don't process any of the

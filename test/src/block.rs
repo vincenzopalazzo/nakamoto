@@ -118,10 +118,10 @@ pub mod gen {
     /// Generates a random transaction with the specified input and value.
     pub fn transaction_with(
         previous_output: OutPoint,
-        value: u64,
+        value: Amount,
         rng: &mut fastrand::Rng,
     ) -> Transaction {
-        assert!(value > 0);
+        assert!(value.to_sat() > 0);
 
         let mut output = Vec::with_capacity(rng.usize(1..8));
         let input = TxIn {
@@ -130,25 +130,25 @@ pub mod gen {
             sequence: Sequence::MAX,
             witness: Witness::new(),
         };
-        let fee = rng.u64(0..value);
-        let mut allowance = value - fee;
+        let fee = rng.u64(0..value.to_sat());
+        let mut allowance = value - Amount::from_sat(fee);
 
         // Outputs.
         for _ in 0..output.capacity() {
             let script_pubkey = script(rng);
-            let v = rng.u64(1..=allowance);
+            let v = rng.u64(1..=allowance.to_sat());
 
             output.push(TxOut {
-                value: Amount(v),
+                value: Amount::from_sat(v),
                 script_pubkey,
             });
 
-            allowance -= v;
-            if allowance == 0 {
+            allowance -= Amount::from_sat(v);
+            if allowance.to_sat() == 0 {
                 break;
             }
         }
-        assert!(output.iter().map(|o| o.value).sum::<u64>() <= value);
+        assert!(output.iter().map(|o| o.value).sum::<Amount>() <= value);
 
         Transaction {
             version: bitcoin::transaction::Version(1),
@@ -173,7 +173,7 @@ pub mod gen {
         let script_pubkey = script(rng);
 
         TxOut {
-            value: rng.u64(1..100_000_000),
+            value: Amount::from_sat(rng.u64(1..100_000_000)),
             script_pubkey,
         }
     }
@@ -422,10 +422,10 @@ pub mod gen {
         birth: Height,
         chain: impl Iterator<Item = &'a Block>,
         rng: &mut fastrand::Rng,
-    ) -> (Vec<ScriptBuf>, Vec<Height>, u64) {
+    ) -> (Vec<ScriptBuf>, Vec<Height>, Amount) {
         let mut watchlist = Vec::new();
         let mut blocks = Vec::new();
-        let mut balance = 0;
+        let mut balance = Amount::from_sat(0);
 
         for (h, blk) in chain.enumerate().skip(birth as usize) {
             // Randomly pick certain blocks.
@@ -446,9 +446,9 @@ pub mod gen {
     pub fn watchlist<'a>(
         birth: Height,
         chain: impl Iterator<Item = &'a Block>,
-    ) -> (Vec<ScriptBuf>, u64) {
+    ) -> (Vec<ScriptBuf>, Amount) {
         let mut watchlist = Vec::new();
-        let mut balance = 0;
+        let mut balance = Amount::from_sat(0);
 
         for blk in chain.skip(birth as usize) {
             let tx = &blk.txdata[0];

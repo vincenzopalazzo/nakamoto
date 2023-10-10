@@ -449,7 +449,7 @@ impl<S: Store<Header = BlockHeader>> BlockCache<S> {
                 self.next_min_difficulty_target(&self.params)
             }
         } else {
-            self.next_difficulty_target(tip.height, tip.time, tip.target(), &self.params)
+            self.next_difficulty_target(&self.params, tip.height, *header, tip.time)
         };
 
         let target = Target::from_compact(CompactTarget::from_consensus(compact_target));
