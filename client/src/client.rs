@@ -30,6 +30,7 @@ use nakamoto_common::block::{BlockHash, BlockHeader, Height, Transaction};
 use nakamoto_common::nonempty::NonEmpty;
 use nakamoto_common::p2p::peer::{Source, Store as _};
 use nakamoto_p2p::fsm;
+use nakamoto_net::{Reactor, Waker};
 
 pub use nakamoto_common::network;
 pub use nakamoto_common::network::Network;
@@ -44,7 +45,6 @@ pub use crate::service::Service;
 
 use crate::event::Mapper;
 use crate::peer;
-use nakamoto_net::{Reactor, Waker};
 
 /// Client configuration.
 #[derive(Debug, Clone)]

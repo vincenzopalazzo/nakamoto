@@ -11,5 +11,9 @@ mod service;
 pub use client::*;
 pub mod handle;
 
+pub mod net {
+    pub use nakamoto_net_poll::{Reactor, Waker};
+}
+
 #[cfg(test)]
 mod tests;
