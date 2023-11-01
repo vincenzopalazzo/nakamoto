@@ -8,10 +8,10 @@ use std::ops::{Bound, RangeInclusive};
 
 use thiserror::Error;
 
-use nakamoto_common::bitcoin::network::constants::ServiceFlags;
-use nakamoto_common::bitcoin::network::message_filter::{CFHeaders, CFilter, GetCFHeaders};
+use nakamoto_common::bitcoin::p2p::ServiceFlags;
+use nakamoto_common::bitcoin::p2p::message_filter::{CFHeaders, CFilter, GetCFHeaders};
 
-use nakamoto_common::bitcoin::{Script, Transaction, Txid};
+use nakamoto_common::bitcoin::{Script, Transaction, Txid, ScriptBuf};
 
 use nakamoto_common::block::filter::{self, BlockFilter, Filters};
 use nakamoto_common::block::time::{Clock, LocalDuration, LocalTime};
@@ -427,7 +427,7 @@ impl<F: Filters, U: Wire<Event> + SetTimer + Disconnect, C: Clock> FilterManager
     }
 
     /// Add scripts to the list of scripts to watch.
-    pub fn watch(&mut self, scripts: Vec<Script>) {
+    pub fn watch(&mut self, scripts: Vec<ScriptBuf>) {
         self.rescan.watch.extend(scripts);
     }
 
@@ -449,7 +449,7 @@ impl<F: Filters, U: Wire<Event> + SetTimer + Disconnect, C: Clock> FilterManager
         &mut self,
         start: Bound<Height>,
         end: Bound<Height>,
-        watch: Vec<Script>,
+        watch: Vec<ScriptBuf>,
         tree: &T,
     ) -> Vec<(Height, BlockHash)> {
         self.rescan.restart(
@@ -463,7 +463,7 @@ impl<F: Filters, U: Wire<Event> + SetTimer + Disconnect, C: Clock> FilterManager
                 Bound::Included(h) => Some(h),
                 Bound::Excluded(h) => Some(h - 1),
             },
-            watch,
+            watch.into_iter(),
         );
 
         self.upstream.event(Event::RescanStarted {

@@ -17,9 +17,9 @@
 use std::net;
 use std::sync::Arc;
 
-use nakamoto_common::bitcoin::network::address::Address;
-use nakamoto_common::bitcoin::network::constants::ServiceFlags;
-use nakamoto_common::bitcoin::network::message_network::VersionMessage;
+use nakamoto_common::bitcoin::p2p::address::Address;
+use nakamoto_common::bitcoin::p2p::ServiceFlags;
+use nakamoto_common::bitcoin::p2p::message_network::VersionMessage;
 
 use nakamoto_common::p2p::peer::{AddressSource, Source};
 use nakamoto_common::p2p::Domain;

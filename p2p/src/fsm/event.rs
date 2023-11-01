@@ -1,5 +1,5 @@
 //! State machine events.
-use nakamoto_common::bitcoin::network::message::NetworkMessage;
+use nakamoto_common::bitcoin::p2p::message::NetworkMessage;
 
 use crate::fsm::{self, Height, LocalTime, PeerId};
 

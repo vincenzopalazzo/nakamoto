@@ -8,7 +8,7 @@ pub use nakamoto_common::block::*;
 /// Solve a block's proof of work puzzle.
 pub fn solve(header: &mut BlockHeader) {
     let target = header.target();
-    while header.validate_pow(&target).is_err() {
+    while header.validate_pow(target).is_err() {
         header.nonce = header.nonce.wrapping_add(1);
     }
 }
@@ -62,11 +62,11 @@ pub mod gen {
     use bitcoin::blockdata::script::Script;
     use bitcoin::blockdata::transaction::{OutPoint, TxIn, TxOut};
     use bitcoin::consensus::Decodable;
-    use bitcoin::hash_types::{PubkeyHash, TxMerkleNode, Txid};
-    use bitcoin::util::bip158;
-    use bitcoin::util::uint::Uint256;
+    use bitcoin::hash_types::{TxMerkleNode, Txid};
+    use bitcoin::bip158;
 
-    use nakamoto_common::bitcoin::{self, PackedLockTime, Sequence, Witness};
+    use nakamoto_common::bitcoin::transaction::Version;
+    use nakamoto_common::bitcoin::{self, Sequence, Witness, absolute, PubkeyHash, ScriptBuf, block, Amount};
     use nakamoto_common::bitcoin_hashes::{hash160, Hash as _};
     use nakamoto_common::block::filter::{BlockFilter, FilterHash, FilterHeader};
     use nakamoto_common::block::*;
@@ -91,7 +91,7 @@ pub mod gen {
                     txid,
                     vout: rng.u32(0..16),
                 },
-                script_sig: Script::new(),
+                script_sig: ScriptBuf::new(),
                 sequence: Sequence::MAX,
                 witness: Witness::new(),
             };
@@ -105,8 +105,8 @@ pub mod gen {
         }
 
         Transaction {
-            version: 1,
-            lock_time: PackedLockTime::ZERO,
+            version: Version::ONE,
+            lock_time: absolute::LockTime::ZERO,
             input,
             output,
         }
@@ -123,7 +123,7 @@ pub mod gen {
         let mut output = Vec::with_capacity(rng.usize(1..8));
         let input = TxIn {
             previous_output,
-            script_sig: Script::new(),
+            script_sig: ScriptBuf::new(),
             sequence: Sequence::MAX,
             witness: Witness::new(),
         };
@@ -136,7 +136,7 @@ pub mod gen {
             let v = rng.u64(1..=allowance);
 
             output.push(TxOut {
-                value: v,
+                value: Amount::from_int_btc(v),
                 script_pubkey,
             });
 
@@ -145,32 +145,34 @@ pub mod gen {
                 break;
             }
         }
-        assert!(output.iter().map(|o| o.value).sum::<u64>() <= value);
+        assert!(output.iter().map(|o| o.value).sum::<Amount>().to_sat() <= value);
 
         Transaction {
-            version: 1,
-            lock_time: PackedLockTime::ZERO,
+            version: Version::ONE,
+            lock_time: absolute::LockTime::ZERO,
             input: vec![input],
             output,
         }
     }
 
-    pub fn script(rng: &mut fastrand::Rng) -> Script {
+    pub fn script(rng: &mut fastrand::Rng) -> ScriptBuf {
         let bytes = std::iter::repeat_with(|| rng.u8(..))
             .take(20)
             .collect::<Vec<_>>();
         let hash = hash160::Hash::from_slice(bytes.as_slice()).unwrap();
-        let pkh = PubkeyHash::from_hash(hash);
+        let pkh = PubkeyHash::from(hash);
 
-        Script::new_p2pkh(&pkh)
+        ScriptBuf::new_p2pkh(&pkh)
     }
 
     /// Generate a random transaction output.
     pub fn tx_out(rng: &mut fastrand::Rng) -> TxOut {
         let script_pubkey = script(rng);
 
+        let value = rng.u64(1..100_000_000);
+        let value = Amount::from_int_btc(value);
         TxOut {
-            value: rng.u64(1..100_000_000),
+            value,
             script_pubkey,
         }
     }
@@ -181,13 +183,13 @@ pub mod gen {
 
         let input = TxIn {
             previous_output: OutPoint::null(),
-            script_sig: Script::new(),
+            script_sig: ScriptBuf::new(),
             sequence: Sequence::MAX,
             witness: Witness::new(),
         };
         Transaction {
-            version: 1,
-            lock_time: PackedLockTime::ZERO,
+            version: Version::ONE,
+            lock_time: absolute::LockTime::ZERO,
             input: vec![input],
             output,
         }
@@ -210,9 +212,9 @@ pub mod gen {
         rng: &mut fastrand::Rng,
     ) -> Block {
         let merkle_root =
-            bitcoin::util::hash::bitcoin_merkle_root(txdata.iter().map(|tx| tx.txid().as_hash()));
+            bitcoin::blockdata::block::Block::compute_merkle_root(txdata.iter().map(|tx| tx.txid().as_raw_hash()));
         let merkle_root = match merkle_root {
-            Some(hash) => TxMerkleNode::from_hash(hash),
+            Some(hash) => TxMerkleNode::from(hash),
             None => TxMerkleNode::all_zeros(),
         };
         let header = header(prev_header, merkle_root, rng);
@@ -230,10 +232,10 @@ pub mod gen {
         let delta = rng.u32(target_spacing - 60..target_spacing + 60);
 
         let time = prev_header.time + delta;
-        let bits = BlockHeader::compact_target_from_u256(&prev_header.target());
+        let bits = prev_header.target().to_compact_lossy();
 
         let mut header = BlockHeader {
-            version: 1,
+            version: block::Version::ONE,
             time,
             nonce: rng.u32(..),
             bits,
@@ -249,9 +251,9 @@ pub mod gen {
     pub fn genesis(rng: &mut fastrand::Rng) -> Block {
         let txdata = vec![coinbase(rng)];
         let merkle_root =
-            bitcoin::util::hash::bitcoin_merkle_root(txdata.iter().map(|tx| tx.txid().as_hash()));
+            bitcoin::blockdata::block::Block::compute_merkle_root(txdata.iter().map(|tx| tx.txid().as_hash()));
         let merkle_root = match merkle_root {
-            Some(hash) => TxMerkleNode::from_hash(hash),
+            Some(hash) => TxMerkleNode::from(hash),
             None => TxMerkleNode::all_zeros(),
         };
 
@@ -261,10 +263,10 @@ pub mod gen {
             0xffffffffffffffffu64,
             0x7fffffffffffffffu64,
         ]);
-        let bits = BlockHeader::compact_target_from_u256(&target);
+        let bits = target;
 
         let mut header = BlockHeader {
-            version: 1,
+            version: block::Version::ONE,
             time: 0,
             nonce: 0,
             bits,
@@ -298,7 +300,7 @@ pub mod gen {
 
             for _ in 0..txdata.capacity() {
                 if let Some((out, value)) = outpoints.pop() {
-                    let tx = transaction_with(out, value, rng);
+                    let tx = transaction_with(out, value.to_sat(), rng);
                     assert!(!tx.output.is_empty());
 
                     utxos.apply(&tx);
@@ -424,10 +426,10 @@ pub mod gen {
         birth: Height,
         chain: impl Iterator<Item = &'a Block>,
         rng: &mut fastrand::Rng,
-    ) -> (Vec<Script>, Vec<Height>, u64) {
+    ) -> (Vec<ScriptBuf>, Vec<Height>, Amount) {
         let mut watchlist = Vec::new();
         let mut blocks = Vec::new();
-        let mut balance = 0;
+        let mut balance = Amount::ZERO;
 
         for (h, blk) in chain.enumerate().skip(birth as usize) {
             // Randomly pick certain blocks.
@@ -448,9 +450,9 @@ pub mod gen {
     pub fn watchlist<'a>(
         birth: Height,
         chain: impl Iterator<Item = &'a Block>,
-    ) -> (Vec<Script>, u64) {
+    ) -> (Vec<ScriptBuf>, Amount) {
         let mut watchlist = Vec::new();
-        let mut balance = 0;
+        let mut balance = Amount::ZERO;
 
         for blk in chain.skip(birth as usize) {
             let tx = &blk.txdata[0];

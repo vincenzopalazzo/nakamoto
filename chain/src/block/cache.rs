@@ -11,22 +11,21 @@ use std::cmp::Ordering;
 use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
 use std::ops::ControlFlow;
 
+use common::bitcoin::{Network, CompactTarget};
+use common::bitcoin::block::ValidationError;
+use common::block::Target;
 use nakamoto_common as common;
-use nakamoto_common::bitcoin;
-use nakamoto_common::bitcoin::blockdata::block::BlockHeader;
+use nakamoto_common::block::BlockHeader;
 use nakamoto_common::bitcoin::consensus::params::Params;
 use nakamoto_common::bitcoin::hash_types::BlockHash;
-use nakamoto_common::bitcoin::network::constants::Network;
-use nakamoto_common::bitcoin::util::BitArray;
 
-use nakamoto_common::bitcoin::util::uint::Uint256;
 use nakamoto_common::block::tree::{self, BlockReader, BlockTree, Branch, Error, ImportResult};
 use nakamoto_common::block::{
     self,
     iter::Iter,
     store::Store,
     time::{self, Clock},
-    Bits, BlockTime, Height, Work,
+    BlockTime, Height, Work,
 };
 use nakamoto_common::nonempty::NonEmpty;
 
@@ -76,7 +75,7 @@ pub struct BlockCache<S: Store> {
     checkpoints: BTreeMap<Height, BlockHash>,
     params: Params,
     /// Total cumulative work on the active chain.
-    chainwork: Uint256,
+    chainwork: Work,
     store: S,
 }
 
@@ -240,17 +239,17 @@ impl<S: Store<Header = BlockHeader>> BlockCache<S> {
         //
         // We do this because it's cheap to verify and prevents flooding attacks.
         let target = header.target();
-        match header.validate_pow(&target) {
+        match header.validate_pow(target) {
             Ok(_) => {
                 let limit = self.params.pow_limit;
                 if target > limit {
                     return Err(Error::InvalidBlockTarget(target, limit));
                 }
             }
-            Err(bitcoin::util::Error::BlockBadProofOfWork) => {
+            Err(ValidationError::BadProofOfWork) => {
                 return Err(Error::InvalidBlockPoW);
             }
-            Err(bitcoin::util::Error::BlockBadTarget) => unreachable! {
+            Err(ValidationError::BadTarget) => unreachable! {
                 // The only way to get a 'bad target' error is to pass a different target
                 // than the one specified in the header.
             },
@@ -288,7 +287,7 @@ impl<S: Store<Header = BlockHeader>> BlockCache<S> {
 
         let mut best_branch = None;
         let mut best_hash = tip.hash();
-        let mut best_work = Uint256::zero();
+        let mut best_work = Work::ZERO;
 
         for branch in candidates.iter() {
             // Total work included in this branch.
@@ -441,7 +440,7 @@ impl<S: Store<Header = BlockHeader>> BlockCache<S> {
     ) -> Result<(), Error> {
         assert_eq!(tip.hash(), header.prev_blockhash);
 
-        let compact_target = if self.params.allow_min_difficulty_blocks
+        let target = if self.params.allow_min_difficulty_blocks
             && (tip.height + 1) % self.params.difficulty_adjustment_interval() != 0
         {
             if header.time > tip.time + self.params.pow_target_spacing as BlockTime * 2 {
@@ -453,13 +452,11 @@ impl<S: Store<Header = BlockHeader>> BlockCache<S> {
             self.next_difficulty_target(tip.height, tip.time, tip.target(), &self.params)
         };
 
-        let target = BlockHeader::u256_from_compact_target(compact_target);
-
-        match header.validate_pow(&target) {
-            Err(bitcoin::util::Error::BlockBadProofOfWork) => {
+        match header.validate_pow(target) {
+            Err(ValidationError::BadProofOfWork) => {
                 return Err(Error::InvalidBlockPoW);
             }
-            Err(bitcoin::util::Error::BlockBadTarget) => {
+            Err(ValidationError::BadTarget) => {
                 return Err(Error::InvalidBlockTarget(header.target(), target));
             }
             Err(_) => unreachable!(),
@@ -491,16 +488,17 @@ impl<S: Store<Header = BlockHeader>> BlockCache<S> {
     }
 
     /// Get the next minimum-difficulty target. Only valid in testnet and regtest networks.
-    fn next_min_difficulty_target(&self, params: &Params) -> Bits {
+    fn next_min_difficulty_target(&self, params: &Params) -> Target {
         assert!(params.allow_min_difficulty_blocks);
 
         let pow_limit_bits = block::pow_limit_bits(&params.network);
+        let pow_limit_bits = pow_limit_bits;
 
         for (height, header) in self.iter().rev() {
-            if header.bits != pow_limit_bits
+            if header.bits != pow_limit_bits.to_compact_lossy()
                 || height % self.params.difficulty_adjustment_interval() == 0
             {
-                return header.bits;
+                return Target::from_compact(header.bits);
             }
         }
         pow_limit_bits

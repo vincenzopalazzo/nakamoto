@@ -2,7 +2,7 @@
 use std::collections::VecDeque;
 
 use nakamoto_common::bitcoin::blockdata::constants::WITNESS_SCALE_FACTOR;
-use nakamoto_common::bitcoin::{Block, OutPoint, Transaction, TxOut};
+use nakamoto_common::bitcoin::{Block, OutPoint, Transaction, TxOut, Amount};
 
 use nakamoto_common::collections::HashMap;
 use nakamoto_common::nonempty::NonEmpty;
@@ -138,8 +138,8 @@ impl FeeEstimator {
     /// Apply the transaction to the UTXO set and calculate the fee rate.
     fn apply(&mut self, tx: &Transaction) -> Option<FeeRate> {
         let txid = tx.txid();
-        let mut received = 0;
-        let mut sent = 0;
+        let mut received = Amount::ZERO;
+        let mut sent = Amount::ZERO;
 
         // Look for outputs.
         for (vout, output) in tx.output.iter().enumerate() {
@@ -151,7 +151,7 @@ impl FeeEstimator {
             sent += output.value;
         }
         // Since coinbase transactions have no inputs, we only process the outputs.
-        if tx.is_coin_base() {
+        if tx.is_coinbase() {
             return None;
         }
 
@@ -169,8 +169,8 @@ impl FeeEstimator {
         assert!(received >= sent, "you can't spend what you don't have",);
 
         let fee = received - sent;
-        let weight = tx.weight();
-        let rate = fee as f64 / (weight as f64 / WITNESS_SCALE_FACTOR as f64);
+        let weight = tx.weight().to_wu(); // FIXME: this `to_wu` is correct?
+        let rate = fee.to_float_in(nakamoto_common::bitcoin::Denomination::Bitcoin)  / (weight as f64 / WITNESS_SCALE_FACTOR as f64);
 
         Some(rate.round() as FeeRate)
     }

@@ -7,15 +7,11 @@ pub mod store;
 pub mod time;
 pub mod tree;
 
-pub use bitcoin::blockdata::block::{Block, BlockHeader};
+pub use bitcoin::blockdata::block::{Block, Header as BlockHeader};
 pub use bitcoin::blockdata::transaction::Transaction;
 pub use bitcoin::hash_types::BlockHash;
-
-/// Difficulty target of a block.
-pub type Target = bitcoin::util::uint::Uint256;
-
-/// Block work.
-pub type Work = bitcoin::util::uint::Uint256;
+pub use bitcoin::Work;
+pub use bitcoin::Target;
 
 /// Compact difficulty bits (target) of a block.
 pub type Bits = u32;
@@ -56,11 +52,12 @@ pub fn locators_indexes(mut from: Height) -> Vec<Height> {
 }
 
 /// Get the proof-of-work limit for the network, in bits.
-pub fn pow_limit_bits(network: &bitcoin::Network) -> Bits {
+pub fn pow_limit_bits(network: &bitcoin::Network) -> Target {
     match network {
-        bitcoin::Network::Bitcoin => 0x1d00ffff,
-        bitcoin::Network::Testnet => 0x1d00ffff,
-        bitcoin::Network::Regtest => 0x207fffff,
-        bitcoin::Network::Signet => 0x1e0377ae,
+        bitcoin::Network::Bitcoin => Target::MAX_ATTAINABLE_MAINNET,
+        bitcoin::Network::Testnet => Target::MAX_ATTAINABLE_TESTNET,
+        bitcoin::Network::Regtest => Target::MAX_ATTAINABLE_REGTEST,
+        bitcoin::Network::Signet => Target::MAX_ATTAINABLE_SIGNET,
+        _ => unimplemented!("not supported {network}")
     }
 }

@@ -13,13 +13,13 @@ use std::rc::Rc;
 
 pub use crossbeam_channel as chan;
 
-use nakamoto_common::bitcoin::network::address::Address;
-use nakamoto_common::bitcoin::network::message::{NetworkMessage, RawNetworkMessage};
-use nakamoto_common::bitcoin::network::message_blockdata::{GetHeadersMessage, Inventory};
-use nakamoto_common::bitcoin::network::message_filter::{
+use nakamoto_common::bitcoin::p2p::address::Address;
+use nakamoto_common::bitcoin::p2p::message::{NetworkMessage, RawNetworkMessage};
+use nakamoto_common::bitcoin::p2p::message_blockdata::{GetHeadersMessage, Inventory};
+use nakamoto_common::bitcoin::p2p::message_filter::{
     CFHeaders, CFilter, GetCFHeaders, GetCFilters,
 };
-use nakamoto_common::bitcoin::network::message_network::VersionMessage;
+use nakamoto_common::bitcoin::p2p::message_network::VersionMessage;
 use nakamoto_common::bitcoin::Transaction;
 use nakamoto_common::block::time::LocalDuration;
 use nakamoto_common::block::{BlockHash, BlockHeader, BlockTime, Height};
@@ -191,10 +191,7 @@ impl Outbox {
 
         self.push(Io::Write(
             addr,
-            RawNetworkMessage {
-                magic: self.network.magic(),
-                payload,
-            },
+            RawNetworkMessage::new(self.network.magic(), payload),
         ));
         self
     }
