@@ -446,7 +446,6 @@ impl<F: Filters, C: Clock> FilterManager<F, C> {
         if range.is_empty() {
             return Err(GetFiltersError::InvalidRange);
         }
-        assert!(*range.end() <= self.filters.height());
 
         // TODO: Only ask peers synced to a certain height.
         // Choose a different peer for each requested range.
